@@ -1,0 +1,11 @@
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/NutrilogApplication.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/model/ParsedFoodItem.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/controller/HealthController.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/config/CorsConfig.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/exception/MealNotFoundException.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/repository/ProfileRepository.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/exception/GlobalExceptionHandler.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/exception/ProfileNotFoundException.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/controller/ProfileController.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/model/Profile.java
+/Users/ruta/Documents/Claude/Projects/NutriLog/backend/src/main/java/com/nutrilog/service/CalorieGoalService.java

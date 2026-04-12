@@ -1,0 +1,12 @@
+com/nutrilog/model/ParsedFoodItem.class
+com/nutrilog/controller/ProfileController.class
+com/nutrilog/NutrilogApplication.class
+com/nutrilog/exception/MealNotFoundException.class
+com/nutrilog/repository/ProfileRepository.class
+com/nutrilog/service/CalorieGoalService.class
+com/nutrilog/controller/ProfileController$ProfileRequest.class
+com/nutrilog/exception/ProfileNotFoundException.class
+com/nutrilog/controller/HealthController.class
+com/nutrilog/config/CorsConfig.class
+com/nutrilog/exception/GlobalExceptionHandler.class
+com/nutrilog/model/Profile.class
