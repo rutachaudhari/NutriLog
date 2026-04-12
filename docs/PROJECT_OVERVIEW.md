@@ -204,29 +204,40 @@ Nothing else. No carbs, no sugar, no micronutrients, no water.
 ## 11. UI Surfaces
 
 ### Landing Page
-- Profile cards loaded dynamically from `GET /profiles`; if empty, show only an "Add Profile" button with a welcome message
+- Profile cards loaded dynamically from `GET /profiles`; each card shows the profile name and today's calorie count (e.g. "840 kcal today")
+- Empty state: "Welcome to NutriLog. Create your first profile to get started." displayed above the "Add Profile" button
 - "Add Profile" button always visible
 - Click a card to open that profile's dashboard
-- No navigation chrome — cards are the entry point
+- Delete button on each card; confirmation copy: "Delete [name]? This will permanently remove all their meal history. This cannot be undone."
+
+### Profile Creation (modal)
+- Triggered by "Add Profile" button; rendered as a centered modal overlay
+- Fields: name (required), age, gender, height (cm), current weight (kg, required), target weight (kg, required), activity level, weekly rate
+- Single `POST /profiles` call on submit — no separate update step
+- On success: modal closes, new card appears, user navigated to new dashboard
 
 ### Dashboard (per profile)
-- Today's calorie count vs. daily target
-- This week's calorie count
-- Current weight and target weight
-- Recommended daily calories (from Mifflin-St Jeor)
-- Estimated weeks to reach target weight
-- Button to log a meal
-- Link to weekly view and profile setup
+- Page heading: "[Name]'s Dashboard" (e.g. "Ruta's Dashboard")
+- "← All Profiles" link in the header for explicit navigation back to the landing page
+- Stats displayed in goal-first order:
+  1. Recommended daily calories (goal, from Mifflin-St Jeor)
+  2. Today's calorie count vs. goal
+  3. This week's calorie count
+  4. Current weight and target weight
+  5. Estimated weeks to reach target weight
+- "Log a Meal" section below the stats
+- Link to profile setup
 
 ### Meal Entry
 - Free-text input field
-- Parsed breakdown preview: each food token listed with its nutrients
+- Parsed breakdown preview: each food token listed with its nutrients and source badge
 - Items not found in either API are flagged — user enters calories manually
-- Confirm button saves to SQLite and returns to dashboard
+- "Save Meal" button saves to SQLite and returns to dashboard; a visible "Cancel" control discards the breakdown without saving
 
-### Profile Setup (per profile)
-- Age, gender (male/female), height (cm), current weight (kg), target weight (kg)
+### Profile Setup — Edit (per profile)
+- Name, age, gender (male/female), height (cm), current weight (kg), target weight (kg)
 - Activity level selector: Sedentary / Lightly active / Moderately active / Very active
+- Name field is editable — user can rename a profile at any time
 - Save recalculates daily calorie target immediately
 
 ### Weekly View (per profile)

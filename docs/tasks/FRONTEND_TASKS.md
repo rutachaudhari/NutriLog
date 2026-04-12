@@ -28,7 +28,7 @@
 
 **Acceptance criteria:**
 - Route `/` renders `<LandingPage />`
-- Route `/dashboard/:personaId` renders `<DashboardPage />`
+- Route `/dashboard/:profileId` renders `<DashboardPage />`
 - Both components can be stubs (return a heading) at this stage
 - `BrowserRouter` wraps the app in `main.jsx`
 - Navigating directly to `/dashboard/1` in the browser renders the dashboard stub without a 404
@@ -44,16 +44,16 @@
 **Functions to implement (map directly to the API contract in BACKEND_TASKS.md):**
 
 ```
-getPersonas()              → GET /personas  → [{id, name, created_at}]
-createPersona(name)        → POST /personas → {id, name, created_at}
-deletePersona(personaId)   → DELETE /personas/{id} → {ok: true}
-getProfile(personaId)
-updateProfile(personaId, profileData)
-parseMeal(personaId, description)
-confirmMeal(mealData)
-getMeals(personaId, date)
-deleteMeal(mealId)
-getSummary(personaId, date)
+getProfiles()                    → GET /profiles        → [{id, name, created_at, ...}]
+createProfile(profileData)       → POST /profiles       → full profile row
+deleteProfile(profileId)         → DELETE /profiles/{id} → {ok: true}
+getProfile(profileId)            → GET /profiles/{id}   → full profile row
+updateProfile(profileId, data)   → PUT /profiles/{id}   → updated profile row
+parseMeal(profileId, description) → POST /meals/parse   → {items, totals}
+confirmMeal(mealData)            → POST /meals          → saved meal row
+getMeals(profileId, date)        → GET /meals           → [{id, description, calories, ...}]
+deleteMeal(mealId)               → DELETE /meals/{id}   → {ok: true}
+getSummary(profileId, date)      → GET /summary         → {date_totals, week_totals}
 ```
 
 **Acceptance criteria:**
@@ -72,7 +72,7 @@ getSummary(personaId, date)
 **What:** Create a minimal layout wrapper that both pages can use — header with the app name and a way to get back to the landing page.
 
 **Acceptance criteria:**
-- `<Layout>` component in `src/components/Layout.jsx` renders a `<header>` with "NutriLog" and a home link, plus `{children}` below
+- `<Layout>` component in `src/components/Layout.jsx` renders a `<header>` with "NutriLog" and a `<Link to="/">` home link (React Router `<Link>`, not `<a>`), plus `{children}` below
 - Both `<LandingPage>` and `<DashboardPage>` stubs render inside `<Layout>`
 - No styling requirement at this stage — semantic HTML only
 
@@ -82,20 +82,20 @@ getSummary(personaId, date)
 
 ## Phase 2 — Landing Page
 
-*Requires backend Phase 1 (Tasks 1.1–1.3) to be running for persona cards to load.*
+*Requires backend Phase 1 (Tasks 1.1–1.3) to be running for profile cards to load.*
 
-### Task 2.1 — Profile cards from GET /personas
+### Task 2.1 — Profile cards from GET /profiles
 
-**What:** Fetch all personas on mount and render a card for each one. Clicking a card navigates to that persona's dashboard.
+**What:** Fetch all profiles on mount and render a card for each one. Clicking a card navigates to that profile's dashboard.
 
 **Acceptance criteria:**
-- `GET /personas` is called on component mount via `getPersonas()` from the API client
-- A card renders for each persona, showing the persona `name`
+- `GET /profiles` is called on component mount via `getProfiles()` from the API client
+- A card renders for each profile, showing the profile `name`
 - If the array is empty: show only the "Add Profile" button and a welcome message ("No profiles yet — create your first one")
 - Clicking a card navigates to `/dashboard/{id}` using React Router `useNavigate`
 - While loading: show a "Loading..." text
 - On API error: show "Could not load profiles — is the backend running?"
-- No hardcoded persona names in JSX — always driven by the API response
+- No hardcoded profile names in JSX — always driven by the API response
 
 **Depends on:** Tasks 1.2, 1.3; backend Task 1.3
 
@@ -103,17 +103,15 @@ getSummary(personaId, date)
 
 ### Task 2.2 — "Add Profile" button and creation form
 
-**What:** An "Add Profile" button is always visible on the landing page. Clicking it opens a form to create a new persona and immediately populate its profile.
+**What:** An "Add Profile" button is always visible on the landing page. Clicking it opens a form to create a new profile in a single API call.
 
 **Acceptance criteria:**
 - "Add Profile" button is always visible regardless of how many profiles exist
 - Clicking opens an inline form or modal with fields: name (text), age (number), gender (radio: male / female), height in cm (number), current weight in kg (number), target weight in kg (number), activity level (select), weekly rate (select)
-- Validation: `name` is required and shown as error if blank on submit; `current_weight_kg` and `target_weight_kg` are required; all other fields are optional at creation
-- On submit:
-  1. Call `createPersona(name)` → receive `{id, name, created_at}`
-  2. If any optional profile fields were provided: call `updateProfile(newPersonaId, profileData)`. Note that `PUT /profiles/{persona_id}` requires all seven profile fields — only make this call if the user filled them all in; otherwise skip and let the user complete the profile from the dashboard
-  3. On success: close the form, add the new card to the landing page, and navigate to `/dashboard/{newPersonaId}`
-- On API error: show an inline error; do not close the form
+- Validation: `name` is required and shown as an inline error if blank on submit; `current_weight_kg` and `target_weight_kg` are required; all other fields are optional at creation
+- On submit: call `createProfile({ name, age, gender, height_cm, current_weight_kg, target_weight_kg, activity_level, weekly_rate_kg })` — a single `POST /profiles` call; the backend handles both identity and health data in one request
+- On success: close the form, add the new card to the landing page without a full reload, and navigate to `/dashboard/{newProfile.id}`
+- On API error: show an inline error message; do not close the form
 
 **Depends on:** Tasks 1.2, 1.3; backend Task 1.3
 
@@ -126,7 +124,7 @@ getSummary(personaId, date)
 **Acceptance criteria:**
 - Each profile card renders a delete button (e.g. small "Delete" label or ✕, visible on hover is acceptable)
 - Clicking the delete button shows a confirmation: "Delete [name]? This will remove all their meal history."
-- On confirm: call `deletePersona(personaId)`; on success remove the card from the page without a full reload
+- On confirm: call `deleteProfile(profileId)`; on success remove the card from the page without a full reload
 - On cancel: no action
 - On API error: show an inline error; do not remove the card
 
@@ -143,7 +141,7 @@ getSummary(personaId, date)
 **What:** On dashboard load, call `GET /summary` for today's date and display both the daily and weekly calorie totals.
 
 **Acceptance criteria:**
-- `personaId` comes from `useParams()`
+- `profileId` comes from `useParams()`
 - Today's date is computed in the component using `new Date()` formatted as `YYYY-MM-DD`
 - Displays: "Today: {calories} kcal" and "This week: {calories} kcal"
 - Displays all four nutrients (calories, protein, fat, fiber) for both periods
@@ -156,12 +154,13 @@ getSummary(personaId, date)
 
 ### Task 3.2 — Profile summary on dashboard
 
-**What:** Fetch the persona's profile and display weight, target weight, recommended daily calories, and weeks to target.
+**What:** Fetch the profile and display name, weight, target weight, recommended daily calories, and weeks to target.
 
 **Acceptance criteria:**
-- `GET /profiles/{personaId}` called on mount alongside the summary call (parallel fetches — do not chain them)
-- Displays: current weight (kg), target weight (kg), recommended daily calories (kcal/day), weeks to target
-- If `current_weight_kg` and `target_weight_kg` are present (set at profile creation), `recommended_daily_calories` is shown immediately if it is non-null — no "set up your profile" prompt for those fields
+- `GET /profiles/{profileId}` called on mount alongside the summary call (parallel fetches — do not chain them)
+- `profileId` comes from `useParams()`
+- Displays: profile name (as a page heading), current weight (kg), target weight (kg), recommended daily calories (kcal/day), weeks to target
+- If `current_weight_kg` and `target_weight_kg` are present, `recommended_daily_calories` is shown immediately if it is non-null — no "set up your profile" prompt for those fields
 - The "Set up your profile to see your calorie goal" prompt (with a link to the profile form, Task 5.1) only appears if `recommended_daily_calories` is null — which happens when age, gender, height, or activity_level are missing (required for Mifflin-St Jeor). Weight fields alone are not enough to compute the goal.
 - Weeks to target displays as a whole number (round up)
 
@@ -179,12 +178,12 @@ getSummary(personaId, date)
 
 **Acceptance criteria:**
 - Text input accepts any string; submit disabled when input is empty
-- On submit: call `parseMeal(personaId, description)`, show a loading indicator while awaiting response
+- On submit: call `parseMeal(profileId, description)` where `profileId` comes from `useParams()`, show a loading indicator while awaiting response
 - On success: render the parsed breakdown (see Task 4.2)
 - On API error: show an inline error message; do not clear the input
 - Input is cleared only after the user confirms the meal (Task 4.3)
 
-**Depends on:** Task 1.3; backend Task 3.3
+**Depends on:** Task 1.3; backend Task 3.5
 
 ---
 
@@ -196,7 +195,7 @@ getSummary(personaId, date)
 - Each item in `items` renders as a row: `name | qty unit | calories kcal | protein_g g | fat_g g | fiber_g g | source badge`
 - Items with `source: "not_found"` render four number inputs (calories, protein, fat, fiber) instead of the looked-up values. All four inputs are optional — only calories is practically required but no field should be forced
 - A totals row shows the sum of all items' nutrients (updated live as the user types into `not_found` inputs)
-- "Source" badge: "USDA" for usda, "OFF" for open_food_facts, "AI Est." for llm_estimate, "Manual" for not_found
+- "Source" badge: "USDA" for `usda`, "OFF" for `open_food_facts`, "AI Est." for `llm_estimate`, "Manual" for `not_found`
 
 **Depends on:** Task 4.1
 
@@ -208,7 +207,8 @@ getSummary(personaId, date)
 
 **Acceptance criteria:**
 - "Confirm and Save" button is disabled until the breakdown is displayed
-- On click: build the request body — `{persona_id, description, items_json: JSON.stringify(items), calories: total, protein_g: total, fat_g: total, fiber_g: total}` — and call `confirmMeal()`
+- On click: build the request body — `{profile_id, description, items_json: JSON.stringify(items), calories: total, protein_g: total, fat_g: total, fiber_g: total}` — and call `confirmMeal()`
+- `profile_id` comes from `useParams()` as `profileId`
 - `not_found` items use the user-entered values (or 0 if left blank) in both `items_json` and the totals
 - On success: clear the meal input and breakdown, then re-fetch summary so today's and weekly totals update immediately (no page reload)
 - On API error: show an error message; do not clear the form
@@ -223,16 +223,17 @@ getSummary(personaId, date)
 
 ### Task 5.1 — Profile form
 
-**What:** Build a form per persona for all seven profile fields. Saving the form calls `PUT /profiles/{personaId}` and refreshes the dashboard's calorie goal display.
+**What:** Build a form per profile for all profile fields. Saving the form calls `PUT /profiles/{profileId}` and refreshes the dashboard's calorie goal display.
 
-**Fields:** age (number), gender (radio: male / female), height in cm (number), current weight in kg (number), target weight in kg (number), activity level (select: Sedentary / Lightly Active / Moderately Active / Very Active), weekly rate of change in kg/week (select or number: 0.25 / 0.5 / 0.75 / 1.0)
+**Fields:** name (text), age (number), gender (radio: male / female), height in cm (number), current weight in kg (number), target weight in kg (number), activity level (select: Sedentary / Lightly Active / Moderately Active / Very Active), weekly rate of change in kg/week (select or number: 0.25 / 0.5 / 0.75 / 1.0)
 
 **Acceptance criteria:**
-- Form pre-populates with existing profile values from `GET /profiles/{personaId}`
-- All seven fields are required for submit; show inline validation errors for missing fields
+- Form pre-populates with existing profile values from `GET /profiles/{profileId}`
+- `profileId` comes from `useParams()`
+- Name field is editable — users can rename a profile at any time
+- All fields except name are optional for save; show inline validation only if the user attempts to save an incomplete set that would prevent calorie goal calculation
 - Activity level select maps display labels to the API values: `"Sedentary" → "sedentary"`, `"Lightly Active" → "lightly_active"`, `"Moderately Active" → "moderately_active"`, `"Very Active" → "very_active"`
-- On save: call `updateProfile(personaId, formData)`, then update the recommended daily calories and weeks to target displayed on the dashboard — no page reload
-- Persona name is displayed on the form as a heading but the field is read-only — name editing is not supported in v1
+- On save: call `updateProfile(profileId, formData)`, then update the profile name (if changed), recommended daily calories, and weeks to target on the dashboard — no page reload
 - The profile form can be rendered as an inline section, a modal, or a separate route — implementer's choice, but it must be reachable from the dashboard
 
 **Depends on:** Tasks 1.3, 3.2; backend Task 2.3
@@ -245,13 +246,14 @@ getSummary(personaId, date)
 
 ### Task 6.1 — Today's meal list
 
-**What:** Below the summary section, list all meals logged today for the active persona.
+**What:** Below the summary section, list all meals logged today for the active profile.
 
 **Acceptance criteria:**
-- Calls `getMeals(personaId, today)` on mount (can share the same mount effect as the summary call — parallel fetches)
+- Calls `getMeals(profileId, today)` on mount (can share the same mount effect as the summary call — parallel fetches)
+- `profileId` comes from `useParams()`
 - Meals rendered in chronological order, each row showing: logged time (HH:MM), description, calorie count
 - Empty state: "No meals logged today" — not blank
-- Meals are scoped to the active `personaId` — verify there is no chance of cross-persona data (the `persona_id` query param must always come from `useParams()`, never from component state or a hardcoded value)
+- Meals are scoped to the active `profileId` — verify there is no chance of cross-profile data (the `profile_id` query param must always come from `useParams()`, never from component state or a hardcoded value)
 
 **Depends on:** Tasks 1.3, 3.1; backend Task 4.2
 

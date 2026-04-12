@@ -44,10 +44,10 @@
 
 | ID | Requirement | Acceptance Criteria |
 |---|---|---|
-| F-01 | Landing page shows all existing profile cards (fetched from backend) plus an "Add Profile" button | On first run with no profiles created, only the "Add Profile" button is shown |
-| F-02 | Clicking a profile card navigates to that profile's dashboard | Browser route changes (e.g. `/dashboard/1`); back button returns to landing |
-| F-03 | Clicking "Add Profile" opens a profile creation form | Form is shown inline or as a modal; user fills in details and submits to create the profile |
-| F-04 | User can delete a profile from the landing page | Deletion requires a confirmation step; confirmed deletion removes the profile and ALL its associated meals from the database |
+| F-01 | Landing page shows all existing profile cards (fetched from backend) plus an "Add Profile" button | Each card shows profile name + today's calorie count (e.g. "840 kcal today"). Empty state: "Welcome to NutriLog. Create your first profile to get started." |
+| F-02 | Clicking a profile card navigates to that profile's dashboard | Browser route changes (e.g. `/dashboard/1`); dashboard has an explicit "← All Profiles" link for navigation back |
+| F-03 | Clicking "Add Profile" opens a profile creation modal | Form is shown as a centered modal overlay; single `POST /profiles` call on submit; modal closes and user is navigated to the new dashboard on success |
+| F-04 | User can delete a profile from the landing page | Deletion requires a confirmation step; confirmation copy: "Delete [name]? This will permanently remove all their meal history. This cannot be undone."; confirmed deletion removes the profile and ALL its associated meals from the database |
 
 ---
 
@@ -57,11 +57,12 @@
 
 | ID | Requirement | Acceptance Criteria |
 |---|---|---|
+| F-09 | Dashboard displays the profile name as the page heading | Heading reads "[Name]'s Dashboard" (e.g. "Ruta's Dashboard") so users always know which profile they are viewing |
 | F-10 | Dashboard shows today's total calorie count | Sum of calories across all meals logged today for this profile |
 | F-11 | Dashboard shows this week's total calorie count | Sum of calories across Mon–Sun of the current ISO week |
 | F-12 | Dashboard shows current weight (kg) | Pulled from profile; user-entered and stored locally |
 | F-13 | Dashboard shows target weight (kg) | Pulled from profile; user-entered and stored locally |
-| F-14 | Dashboard shows recommended daily calorie intake | Calculated from profile fields using Mifflin-St Jeor; see section 5 for formula |
+| F-14 | Dashboard shows recommended daily calorie intake | Calculated from profile fields using Mifflin-St Jeor; see section 5 for formula. Displayed first (above today's count) so the goal is always the reference point |
 | F-15 | Dashboard has a "Log a Meal" section with a free-text input field | Text field accepts any string; submission triggers the meal parsing flow |
 | F-16 | Today's calorie count and weekly count update immediately after a meal is confirmed | No page refresh required |
 
@@ -82,8 +83,8 @@
 | F-25 | User can manually enter calories (and optionally protein, fat, fiber) for any "not found" item | Inline numeric inputs appear per unfound item before the user confirms the meal |
 | F-26 | Backend sums the 4 nutrients across all items to produce meal totals | Calories, protein (g), fat (g), fiber (g) all totalled |
 | F-27 | User sees a breakdown before confirming: each food item with its individual nutrient values, and the meal total | Confirmation step shown inline; user can review before saving |
-| F-28 | User confirms → meal is saved to SQLite | Row created in `meals` table with all 4 nutrient totals and the per-item breakdown |
-| F-29 | If the user does not confirm, nothing is saved | No partial or phantom meal records |
+| F-28 | User clicks "Save Meal" → meal is saved to SQLite | Row created in `meals` table with all 4 nutrient totals and the per-item breakdown; button label is "Save Meal" (not "Confirm") |
+| F-29 | If the user cancels or navigates away, nothing is saved | A visible "Cancel" control discards the breakdown; no partial or phantom meal records |
 
 ---
 
@@ -192,12 +193,12 @@ CREATE TABLE meals (
     protein_g    REAL DEFAULT 0,
     fat_g        REAL DEFAULT 0,
     fiber_g      REAL DEFAULT 0,
-    items_json   TEXT               -- JSON array: [{name, quantity, unit, calories, protein_g, fat_g, fiber_g, source, not_found}]
+    items_json   TEXT               -- JSON array: [{name, quantity_g, unit, calories, protein_g, fat_g, fiber_g, source, not_found}]
 );
 ```
 
 **Notes:**
-- `items_json.source` values: `"usda"`, `"open_food_facts"`, `"manual"`, `"not_found"`
+- `items_json.source` values: `"usda"`, `"open_food_facts"`, `"llm_estimate"`, `"not_found"`
 - Weekly and daily totals are computed at query time — no pre-aggregation needed at this scale
 - `profiles` table starts empty; no seed data is inserted on startup — all profiles are user-created
 - Health stats fields (age, gender, height, weights, activity level) are set when the user completes the profile creation form and can be updated at any time
@@ -229,6 +230,7 @@ Runs once on every app startup, after schema initialisation.
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/profiles` | Returns list of profiles |
+| `GET` | `/profiles/{id}` | Returns a single profile by ID; used by the dashboard on load |
 | `POST` | `/profiles` | Creates a new profile (name + health fields); triggers Mifflin-St Jeor calculation |
 | `DELETE` | `/profiles/{id}` | Deletes a profile and all its associated meals |
 | `PUT` | `/profiles/{id}` | Updates name and/or health fields for a profile; recalculates and stores recommended daily calories |
