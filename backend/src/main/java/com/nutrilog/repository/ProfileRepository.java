@@ -1,7 +1,6 @@
 package com.nutrilog.repository;
 
 import com.nutrilog.model.Profile;
-import com.nutrilog.service.CalorieGoalService;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -14,18 +13,17 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Repository
 public class ProfileRepository {
 
     private final JdbcTemplate jdbc;
-    private final CalorieGoalService calorieGoalService;
     private final RowMapper<Profile> rowMapper;
 
-    public ProfileRepository(JdbcTemplate jdbc, CalorieGoalService calorieGoalService) {
+    public ProfileRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        this.calorieGoalService = calorieGoalService;
         this.rowMapper = (rs, rowNum) -> mapRow(rs);
     }
 
@@ -42,11 +40,7 @@ public class ProfileRepository {
         p.setActivityLevel(rs.getString("activity_level"));
         p.setWeeklyRateKg(nullableDouble(rs, "weekly_rate_kg"));
         p.setRecommendedDailyCalories(nullableDouble(rs, "recommended_daily_calories"));
-
-        // Compute weeksToTarget (not stored)
-        Double weeksToTarget = calorieGoalService.computeWeeksToTarget(
-                p.getCurrentWeightKg(), p.getTargetWeightKg(), p.getWeeklyRateKg());
-        p.setWeeksToTarget(weeksToTarget);
+        p.setWeeksToTarget(null);
 
         return p;
     }
@@ -96,7 +90,7 @@ public class ProfileRepository {
             return ps;
         }, keyHolder);
 
-        long id = keyHolder.getKey().longValue();
+        long id = Objects.requireNonNull(keyHolder.getKey(), "Insert did not return generated key").longValue();
         return findById(id).orElseThrow();
     }
 

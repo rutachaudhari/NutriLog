@@ -27,13 +27,21 @@ public class ProfileController {
 
     @GetMapping
     public List<Profile> getAll() {
-        return profileRepository.findAll();
+        List<Profile> profiles = profileRepository.findAll();
+        for (Profile p : profiles) {
+            p.setWeeksToTarget(calorieGoalService.computeWeeksToTarget(
+                    p.getCurrentWeightKg(), p.getTargetWeightKg(), p.getWeeklyRateKg()));
+        }
+        return profiles;
     }
 
     @GetMapping("/{id}")
     public Profile getById(@PathVariable Long id) {
-        return profileRepository.findById(id)
+        Profile p = profileRepository.findById(id)
                 .orElseThrow(() -> new ProfileNotFoundException(id));
+        p.setWeeksToTarget(calorieGoalService.computeWeeksToTarget(
+                p.getCurrentWeightKg(), p.getTargetWeightKg(), p.getWeeklyRateKg()));
+        return p;
     }
 
     @PostMapping
@@ -59,7 +67,10 @@ public class ProfileController {
         );
         profile.setRecommendedDailyCalories(calories);
 
-        return profileRepository.save(profile);
+        Profile saved = profileRepository.save(profile);
+        saved.setWeeksToTarget(calorieGoalService.computeWeeksToTarget(
+                saved.getCurrentWeightKg(), saved.getTargetWeightKg(), saved.getWeeklyRateKg()));
+        return saved;
     }
 
     @PutMapping("/{id}")
@@ -103,7 +114,10 @@ public class ProfileController {
             existing.setRecommendedDailyCalories(calories);
         }
 
-        return profileRepository.update(existing);
+        Profile updated = profileRepository.update(existing);
+        updated.setWeeksToTarget(calorieGoalService.computeWeeksToTarget(
+                updated.getCurrentWeightKg(), updated.getTargetWeightKg(), updated.getWeeklyRateKg()));
+        return updated;
     }
 
     @DeleteMapping("/{id}")

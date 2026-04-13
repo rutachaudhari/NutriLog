@@ -23,3 +23,6 @@ CREATE TABLE IF NOT EXISTS meals (
     fiber_g      REAL DEFAULT 0,
     items_json   TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_meals_profile_id ON meals(profile_id);
+CREATE INDEX IF NOT EXISTS idx_meals_logged_at ON meals(logged_at);

@@ -32,6 +32,9 @@ public class CalorieGoalService {
                 "moderately_active", 1.55,
                 "very_active", 1.725
         );
+        if (!multipliers.containsKey(activityLevel)) {
+            throw new IllegalArgumentException("Unknown activity level: " + activityLevel);
+        }
         double tdee = bmr * multipliers.get(activityLevel);
 
         // Adjust for goal

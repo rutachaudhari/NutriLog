@@ -21,7 +21,7 @@ public class ParsedFoodItem {
     @JsonProperty("fiber_g")
     private Double fiberG;
 
-    private String source;
+    private FoodSource source;
 
     @JsonProperty("not_found")
     private Boolean notFound;
@@ -49,8 +49,8 @@ public class ParsedFoodItem {
     public Double getFiberG() { return fiberG; }
     public void setFiberG(Double fiberG) { this.fiberG = fiberG; }
 
-    public String getSource() { return source; }
-    public void setSource(String source) { this.source = source; }
+    public FoodSource getSource() { return source; }
+    public void setSource(FoodSource source) { this.source = source; }
 
     public Boolean getNotFound() { return notFound; }
     public void setNotFound(Boolean notFound) { this.notFound = notFound; }
