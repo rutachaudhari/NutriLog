@@ -39,7 +39,7 @@ public class MealParserOrchestrator {
         Mono<List<ParsedFoodItem>> resolvedItems;
 
         if (llmItems.isEmpty()) {
-            // LLM failed: fall back to splitting description and looking up each token
+            // LLM failed entirely: fall back to splitting description and looking up each token
             List<String> tokens = Arrays.stream(description.split("(?i)\\s+and\\s+|,|\\s+with\\s+"))
                     .map(String::trim)
                     .filter(s -> !s.isBlank())
@@ -49,14 +49,16 @@ public class MealParserOrchestrator {
                     .flatMap(token -> resolveToken(token, 100.0))
                     .collectList();
         } else {
-            // LLM returned items: verify each via USDA -> OFF -> llm_estimate/not_found
+            // LLM returned items: use estimates directly when available, only hit external
+            // APIs for items where LLM had no nutrient data
             resolvedItems = Flux.fromIterable(llmItems)
-                    .flatMap(llmItem -> resolveWithFallback(llmItem)
+                    .flatMap(llmItem -> resolveItem(llmItem)
                             .onErrorResume(e -> {
-                                log.warn("Error resolving item '{}', falling back to not_found: {}",
+                                log.warn("Error resolving item '{}', falling back to llm_estimate/not_found: {}",
                                         llmItem.getName(), e.getMessage());
-                                llmItem.setSource(FoodSource.NOT_FOUND);
-                                llmItem.setNotFound(true);
+                                boolean hasEstimates = hasNonZeroNutrients(llmItem);
+                                llmItem.setSource(hasEstimates ? FoodSource.LLM_ESTIMATE : FoodSource.NOT_FOUND);
+                                llmItem.setNotFound(!hasEstimates);
                                 return Mono.just(llmItem);
                             }))
                     .collectList();
@@ -69,7 +71,24 @@ public class MealParserOrchestrator {
     }
 
     /**
-     * For a plain token (from fallback split): USDA -> OFF -> not_found
+     * Primary resolution strategy for LLM-provided items:
+     * - If LLM already has non-zero nutrients, trust it directly (LLM_ESTIMATE)
+     * - Only call external APIs when LLM has no useful data
+     */
+    private Mono<ParsedFoodItem> resolveItem(ParsedFoodItem llmItem) {
+        if (hasNonZeroNutrients(llmItem)) {
+            llmItem.setSource(FoodSource.LLM_ESTIMATE);
+            llmItem.setNotFound(false);
+            if (llmItem.getQuantityG() == null) llmItem.setQuantityG(100.0);
+            return Mono.just(llmItem);
+        }
+        // LLM gave no data: try external sources
+        return resolveToken(llmItem.getName(),
+                llmItem.getQuantityG() != null ? llmItem.getQuantityG() : 100.0);
+    }
+
+    /**
+     * For a plain token (no LLM data): USDA -> OFF -> not_found
      */
     private Mono<ParsedFoodItem> resolveToken(String token, double quantityG) {
         return usdaLookupService.lookupByName(token, quantityG)
@@ -78,49 +97,11 @@ public class MealParserOrchestrator {
                         return Mono.just(usdaResult.get());
                     }
                     return openFoodFactsService.lookupByName(token, quantityG)
-                            .map(offResult -> {
-                                if (offResult.isPresent()) {
-                                    return offResult.get();
-                                }
-                                return notFoundItem(token, quantityG);
-                            });
+                            .map(offResult -> offResult.isPresent() ? offResult.get() : notFoundItem(token, quantityG));
                 })
                 .onErrorResume(e -> {
                     log.warn("Error resolving token '{}': {}", token, e.getMessage());
                     return Mono.just(notFoundItem(token, quantityG));
-                });
-    }
-
-    /**
-     * For an LLM-provided item: USDA -> OFF -> llm_estimate/not_found
-     */
-    private Mono<ParsedFoodItem> resolveWithFallback(ParsedFoodItem llmItem) {
-        String name = llmItem.getName();
-        Double quantityG = llmItem.getQuantityG() != null ? llmItem.getQuantityG() : 100.0;
-
-        return usdaLookupService.lookupByName(name, quantityG)
-                .flatMap(usdaResult -> {
-                    if (usdaResult.isPresent()) {
-                        // Preserve name and quantity from LLM, use USDA nutrients
-                        ParsedFoodItem item = usdaResult.get();
-                        item.setName(llmItem.getName());
-                        item.setQuantityG(quantityG);
-                        return Mono.just(item);
-                    }
-                    return openFoodFactsService.lookupByName(name, quantityG)
-                            .map(offResult -> {
-                                if (offResult.isPresent()) {
-                                    ParsedFoodItem item = offResult.get();
-                                    item.setName(llmItem.getName());
-                                    item.setQuantityG(quantityG);
-                                    return item;
-                                }
-                                // No external source: use LLM estimate or not_found
-                                boolean hasEstimates = hasNonZeroNutrients(llmItem);
-                                llmItem.setSource(hasEstimates ? FoodSource.LLM_ESTIMATE : FoodSource.NOT_FOUND);
-                                llmItem.setNotFound(!hasEstimates);
-                                return llmItem;
-                            });
                 });
     }
 

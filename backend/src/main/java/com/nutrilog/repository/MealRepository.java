@@ -63,22 +63,23 @@ public class MealRepository {
 
     public Meal save(Meal meal) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
+        boolean hasLoggedAt = meal.getLoggedAt() != null && !meal.getLoggedAt().isBlank();
 
         jdbc.update(con -> {
-            PreparedStatement ps = con.prepareStatement(
-                    "INSERT INTO meals (profile_id, description, calories, protein_g, fat_g, fiber_g, items_json) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    Statement.RETURN_GENERATED_KEYS
-            );
+            String sql = hasLoggedAt
+                    ? "INSERT INTO meals (profile_id, description, calories, protein_g, fat_g, fiber_g, items_json, logged_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                    : "INSERT INTO meals (profile_id, description, calories, protein_g, fat_g, fiber_g, items_json) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             ps.setObject(1, meal.getProfileId());
             ps.setObject(2, meal.getDescription());
             ps.setObject(3, meal.getCalories());
             ps.setObject(4, meal.getProteinG());
             ps.setObject(5, meal.getFatG());
             ps.setObject(6, meal.getFiberG());
-            // itemsJson on Meal is a JsonNode; for save we receive a String from the controller
-            // The controller sets a raw string via a transient holder — handled below
             ps.setObject(7, meal.getItemsJsonRaw());
+            if (hasLoggedAt) {
+                ps.setObject(8, meal.getLoggedAt());
+            }
             return ps;
         }, keyHolder);
 
@@ -91,6 +92,14 @@ public class MealRepository {
                 "SELECT * FROM meals WHERE profile_id = ? AND DATE(logged_at) = ? ORDER BY logged_at ASC",
                 rowMapper,
                 profileId, date
+        );
+    }
+
+    public List<Meal> findByProfileIdAndDateRange(Long profileId, String startDate, String endDate) {
+        return jdbc.query(
+                "SELECT * FROM meals WHERE profile_id = ? AND DATE(logged_at) BETWEEN ? AND ? ORDER BY logged_at ASC",
+                rowMapper,
+                profileId, startDate, endDate
         );
     }
 

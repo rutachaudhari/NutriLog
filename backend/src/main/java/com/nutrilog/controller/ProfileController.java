@@ -6,8 +6,9 @@ import com.nutrilog.model.Profile;
 import com.nutrilog.repository.ProfileRepository;
 import com.nutrilog.service.CalorieGoalService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,6 +47,9 @@ public class ProfileController {
 
     @PostMapping
     public Profile create(@RequestBody @Valid ProfileRequest request) {
+        if (request.name() == null || request.name().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "name is required");
+        }
         Profile profile = new Profile();
         profile.setName(request.name());
         profile.setAge(request.age());
@@ -132,7 +136,7 @@ public class ProfileController {
     // --- Request DTO ---
 
     public record ProfileRequest(
-            @NotBlank String name,
+            String name,
 
             Integer age,
             String gender,

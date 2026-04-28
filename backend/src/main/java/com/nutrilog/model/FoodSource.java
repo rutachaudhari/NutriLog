@@ -6,6 +6,7 @@ public enum FoodSource {
     USDA("usda"),
     OPEN_FOOD_FACTS("open_food_facts"),
     LLM_ESTIMATE("llm_estimate"),
+    MANUAL("manual"),
     NOT_FOUND("not_found");
 
     private final String value;

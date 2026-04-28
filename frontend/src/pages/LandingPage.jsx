@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Layout from '../components/Layout'
-import { getProfiles, createProfile, deleteProfile } from '../api/client'
+import { getProfiles, createProfile, deleteProfile, getSummary } from '../api/client'
+import styles from './LandingPage.module.css'
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+const AVATAR_COLORS = ['#e11d48', '#7c3aed', '#0284c7', '#d97706', '#059669', '#db2777']
 
 const ACTIVITY_OPTIONS = [
   { label: 'Sedentary', value: 'sedentary' },
@@ -9,18 +15,10 @@ const ACTIVITY_OPTIONS = [
   { label: 'Moderately Active', value: 'moderately_active' },
   { label: 'Very Active', value: 'very_active' },
 ]
-
 const RATE_OPTIONS = ['0.25', '0.5', '0.75', '1.0']
-
 const EMPTY_FORM = {
-  name: '',
-  age: '',
-  gender: '',
-  height_cm: '',
-  current_weight_kg: '',
-  target_weight_kg: '',
-  activity_level: '',
-  weekly_rate_kg: '',
+  name: '', age: '', gender: '', height_cm: '',
+  current_weight_kg: '', target_weight_kg: '', activity_level: '', weekly_rate_kg: '',
 }
 
 function buildProfileBody(form) {
@@ -37,22 +35,34 @@ function buildProfileBody(form) {
 
 export default function LandingPage() {
   const navigate = useNavigate()
-
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [nameError, setNameError] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  const [deleteErrors, setDeleteErrors] = useState({})
+  const [selectingId, setSelectingId] = useState(null)
+  const [profileSummaries, setProfileSummaries] = useState({})
 
   useEffect(() => {
     getProfiles()
-      .then(setProfiles)
+      .then(profileList => {
+        setProfiles(profileList)
+        const today = todayStr()
+        Promise.allSettled(
+          profileList.map(p => getSummary(p.id, today))
+        ).then(results => {
+          const summaries = {}
+          profileList.forEach((p, i) => {
+            if (results[i].status === 'fulfilled') {
+              summaries[p.id] = results[i].value
+            }
+          })
+          setProfileSummaries(summaries)
+        })
+      })
       .catch(() => setError('Could not load profiles — is the backend running?'))
       .finally(() => setLoading(false))
   }, [])
@@ -65,10 +75,7 @@ export default function LandingPage() {
 
   async function handleCreate(e) {
     e.preventDefault()
-    if (!form.name.trim()) {
-      setNameError('Name is required.')
-      return
-    }
+    if (!form.name.trim()) { setNameError('Name is required.'); return }
     setSubmitting(true)
     setSubmitError('')
     try {
@@ -76,7 +83,7 @@ export default function LandingPage() {
       setProfiles(prev => [...prev, newProfile])
       setShowForm(false)
       setForm(EMPTY_FORM)
-      navigate(`/dashboard/${newProfile.id}`)
+      handleSelect(newProfile)
     } catch (err) {
       setSubmitError(err.message)
     } finally {
@@ -84,144 +91,159 @@ export default function LandingPage() {
     }
   }
 
-  async function handleDelete(profile) {
-    if (!window.confirm(`Delete ${profile.name}? This will remove all their meal history.`)) return
-    setDeleteErrors(prev => ({ ...prev, [profile.id]: null }))
+  async function handleDelete(e, profile) {
+    e.stopPropagation()
+    if (!window.confirm(`Delete ${profile.name}? This will permanently remove all their meal history. This cannot be undone.`)) return
     try {
       await deleteProfile(profile.id)
       setProfiles(prev => prev.filter(p => p.id !== profile.id))
     } catch (err) {
-      setDeleteErrors(prev => ({ ...prev, [profile.id]: err.message }))
+      alert(err.message)
     }
   }
 
+  function handleSelect(profile) {
+    setSelectingId(profile.id)
+    setTimeout(() => navigate(`/dashboard/${profile.id}`), 320)
+  }
+
+  if (loading) return (
+    <div className={styles.page}>
+      <p className={styles.infoMsg}>Loading...</p>
+    </div>
+  )
+
+  if (error) return (
+    <div className={styles.page}>
+      <p className={styles.errorMsg}>{error}</p>
+    </div>
+  )
+
   return (
-    <Layout>
-      <div className="section-header">
-        <h1 style={{ margin: 0 }}>Profiles</h1>
-        <button
-          className="btn-primary"
-          onClick={() => { setShowForm(s => !s); setSubmitError(''); setNameError('') }}
-        >
-          {showForm ? 'Cancel' : 'Add Profile'}
-        </button>
+    <div className={styles.page}>
+      <div className={styles.brand}>
+        <h1 className={styles.brandName}>NutriLog</h1>
+        <p className={styles.brandSub}>AI-powered nutrition tracking</p>
       </div>
 
-      {showForm && (
-        <div className="form-section">
-          <h2 style={{ marginTop: 0 }}>New Profile</h2>
-          <form onSubmit={handleCreate} noValidate>
-            <div className="form-group">
-              <label htmlFor="name">Name *</label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                value={form.name}
-                onChange={handleField}
-                autoFocus
-              />
-              {nameError && <span className="error-msg">{nameError}</span>}
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="age">Age</label>
-                <input id="age" name="age" type="number" min="1" max="120" value={form.age} onChange={handleField} />
+      {!showForm ? (
+        <>
+          {profiles.length === 0 ? (
+            <p className={styles.emptyState}>Welcome to NutriLog. Create your first profile to get started.</p>
+          ) : (
+            <h2 className={styles.heading}>Who's tracking?</h2>
+          )}
+          <div className={styles.grid}>
+            {profiles.map((profile, i) => (
+              <div
+                key={profile.id}
+                className={`${styles.avatarCard}${selectingId === profile.id ? ' ' + styles.selecting : ''}`}
+                onClick={() => handleSelect(profile)}
+              >
+                <div
+                  className={styles.avatarCircle}
+                  style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}
+                >
+                  {profile.name.charAt(0).toUpperCase()}
+                </div>
+                <span className={styles.avatarName}>{profile.name}</span>
+                {profileSummaries[profile.id] != null && (
+                  <span className={styles.cardCalories}>
+                    {Math.round(profileSummaries[profile.id]?.date_totals?.calories ?? 0)} kcal today
+                  </span>
+                )}
+                <div className={styles.cardActions}>
+                  <button
+                    className={styles.deleteBtn}
+                    onClick={(e) => handleDelete(e, profile)}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-              <div className="form-group">
-                <label>Gender</label>
-                <div className="radio-group">
-                  <label>
-                    <input type="radio" name="gender" value="male" checked={form.gender === 'male'} onChange={handleField} />
-                    Male
+            ))}
+            <button className={styles.addCard} onClick={() => setShowForm(true)}>
+              <div className={styles.addCircle}>+</div>
+              <span className={styles.addLabel}>Add Profile</span>
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className={styles.formPanel}>
+          <h2 className={styles.formTitle}>New Profile</h2>
+          <form onSubmit={handleCreate} noValidate>
+            <div className={styles.formGroup}>
+              <label className={styles.label} htmlFor="name">Name *</label>
+              <input
+                className={styles.input}
+                id="name" name="name" type="text"
+                value={form.name} onChange={handleField} autoFocus
+              />
+              {nameError && <span className={styles.errorMsg}>{nameError}</span>}
+            </div>
+            <div className={styles.formRow}>
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="age">Age</label>
+                <input className={styles.input} id="age" name="age" type="number" min="1" max="120" value={form.age} onChange={handleField} />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Gender</label>
+                <div className={styles.radioGroup}>
+                  <label className={styles.radioLabel}>
+                    <input type="radio" name="gender" value="male" checked={form.gender === 'male'} onChange={handleField} /> Male
                   </label>
-                  <label>
-                    <input type="radio" name="gender" value="female" checked={form.gender === 'female'} onChange={handleField} />
-                    Female
+                  <label className={styles.radioLabel}>
+                    <input type="radio" name="gender" value="female" checked={form.gender === 'female'} onChange={handleField} /> Female
                   </label>
                 </div>
               </div>
             </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="height_cm">Height (cm)</label>
-                <input id="height_cm" name="height_cm" type="number" min="50" max="300" value={form.height_cm} onChange={handleField} />
+            <div className={styles.formRow}>
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="height_cm">Height (cm)</label>
+                <input className={styles.input} id="height_cm" name="height_cm" type="number" min="50" max="300" value={form.height_cm} onChange={handleField} />
               </div>
-              <div className="form-group">
-                <label htmlFor="current_weight_kg">Current Weight (kg)</label>
-                <input id="current_weight_kg" name="current_weight_kg" type="number" min="1" step="0.1" value={form.current_weight_kg} onChange={handleField} />
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="current_weight_kg">Current Weight (kg)</label>
+                <input className={styles.input} id="current_weight_kg" name="current_weight_kg" type="number" min="1" step="0.1" value={form.current_weight_kg} onChange={handleField} />
               </div>
             </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="target_weight_kg">Target Weight (kg)</label>
-                <input id="target_weight_kg" name="target_weight_kg" type="number" min="1" step="0.1" value={form.target_weight_kg} onChange={handleField} />
+            <div className={styles.formRow}>
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="target_weight_kg">Target Weight (kg)</label>
+                <input className={styles.input} id="target_weight_kg" name="target_weight_kg" type="number" min="1" step="0.1" value={form.target_weight_kg} onChange={handleField} />
               </div>
-              <div className="form-group">
-                <label htmlFor="activity_level">Activity Level</label>
-                <select id="activity_level" name="activity_level" value={form.activity_level} onChange={handleField}>
+              <div className={styles.formGroup}>
+                <label className={styles.label} htmlFor="activity_level">Activity Level</label>
+                <select className={styles.select} id="activity_level" name="activity_level" value={form.activity_level} onChange={handleField}>
                   <option value="">— Select —</option>
-                  {ACTIVITY_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
+                  {ACTIVITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
             </div>
-
-            <div className="form-group">
-              <label htmlFor="weekly_rate_kg">Weekly Rate (kg/week)</label>
-              <select id="weekly_rate_kg" name="weekly_rate_kg" value={form.weekly_rate_kg} onChange={handleField}>
+            <div className={styles.formGroup}>
+              <label className={styles.label} htmlFor="weekly_rate_kg">Weekly Rate (kg/week)</label>
+              <select className={styles.select} id="weekly_rate_kg" name="weekly_rate_kg" value={form.weekly_rate_kg} onChange={handleField}>
                 <option value="">— Select —</option>
                 {RATE_OPTIONS.map(r => <option key={r} value={r}>{r} kg/week</option>)}
               </select>
             </div>
-
-            {submitError && <p className="error-msg">{submitError}</p>}
-
-            <div className="btn-row">
-              <button type="submit" className="btn-primary" disabled={submitting}>
+            {submitError && <p className={styles.errorMsg}>{submitError}</p>}
+            <div className={styles.btnRow}>
+              <button type="submit" className={styles.btnPrimary} disabled={submitting}>
                 {submitting ? 'Creating…' : 'Create Profile'}
               </button>
-              <button type="button" className="btn-secondary" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setNameError(''); setSubmitError('') }}>
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setNameError(''); setSubmitError('') }}
+              >
                 Cancel
               </button>
             </div>
           </form>
         </div>
       )}
-
-      {loading && <p>Loading...</p>}
-      {error && <p className="error-msg">{error}</p>}
-
-      {!loading && !error && profiles.length === 0 && !showForm && (
-        <p className="info-msg">No profiles yet — create your first one</p>
-      )}
-
-      {!loading && !error && profiles.length > 0 && (
-        <div className="card-grid">
-          {profiles.map(profile => (
-            <div key={profile.id} className="profile-card">
-              <span className="profile-card-name" onClick={() => navigate(`/dashboard/${profile.id}`)}>
-                {profile.name}
-              </span>
-              <div>
-                <button
-                  className="btn-danger"
-                  onClick={() => handleDelete(profile)}
-                >
-                  Delete
-                </button>
-                {deleteErrors[profile.id] && (
-                  <p className="error-msg" style={{ margin: '4px 0 0' }}>{deleteErrors[profile.id]}</p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Layout>
+    </div>
   )
 }

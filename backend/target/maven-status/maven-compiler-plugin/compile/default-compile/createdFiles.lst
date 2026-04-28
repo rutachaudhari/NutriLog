@@ -1,6 +1,7 @@
 com/nutrilog/model/FoodSource.class
 com/nutrilog/config/WebClientConfig.class
 com/nutrilog/model/ParsedFoodItem.class
+com/nutrilog/controller/MealController$ManualFoodItem.class
 com/nutrilog/controller/MealController$MealSaveRequest.class
 com/nutrilog/NutrilogApplication.class
 com/nutrilog/repository/MealRepository.class
@@ -16,6 +17,7 @@ com/nutrilog/service/StartupService.class
 com/nutrilog/controller/SummaryController.class
 com/nutrilog/controller/ProfileController.class
 com/nutrilog/exception/MealNotFoundException.class
+com/nutrilog/controller/MealController$ManualParseRequest.class
 com/nutrilog/model/ParseResponse.class
 com/nutrilog/exception/ServiceUnavailableException.class
 com/nutrilog/service/CalorieGoalService.class
