@@ -11,27 +11,25 @@
 NutriLog is a locally-hosted, zero-cost nutrition tracker. All components run on a single machine — no cloud, no accounts, no paid infrastructure required.
 
 ```mermaid
-C4Context
-    title NutriLog — System Context
+flowchart TD
+    User(["👤 User\n(Browser)"])
 
-    Person(user, "User", "Logs meals and tracks nutrition via a browser")
+    subgraph localhost["localhost"]
+        FE["React Frontend\n:5173\nProfile cards · Dashboard · Meal entry"]
+        BE["Spring Boot Backend\n:8080\nMeal parsing · Profiles · Calorie goals"]
+        DB[("SQLite\nnurilog.db\nProfiles · Meals · Nutrients")]
+    end
 
-    System_Boundary(local, "localhost") {
-        System(frontend, "React Frontend", "Vite dev server on :5173. Profile cards, dashboard, meal entry.")
-        System(backend, "Spring Boot Backend", "REST API on :8080. Meal parsing, profile management, calorie goal calculation.")
-        SystemDb(db, "SQLite", "Single-file database. Profiles, meals, nutrient totals.")
-    }
+    Groq["Groq API — Llama 3\nFree LLM\nParses meal text → structured items"]
+    USDA["USDA FoodData Central\nFree nutrient DB\nVerifies LLM estimates"]
+    OFF["Open Food Facts\nFree fallback\nNo API key required"]
 
-    System_Ext(groq, "Groq API (Llama 3)", "Free LLM. Parses free-text meal descriptions into structured food items.")
-    System_Ext(usda, "USDA FoodData Central", "Free nutrient database. Verifies LLM estimates per food item.")
-    System_Ext(off, "Open Food Facts", "Free fallback nutrient API. No API key required.")
-
-    Rel(user, frontend, "Uses", "Browser")
-    Rel(frontend, backend, "Calls", "HTTP/JSON on :8080")
-    Rel(backend, db, "Reads/Writes", "JDBC / JdbcTemplate")
-    Rel(backend, groq, "Parses meal text", "HTTPS")
-    Rel(backend, usda, "Verifies nutrients", "HTTPS")
-    Rel(backend, off, "Fallback lookup", "HTTPS")
+    User -->|"Browser"| FE
+    FE -->|"HTTP/JSON"| BE
+    BE -->|"JDBC"| DB
+    BE -->|"HTTPS — meal parse"| Groq
+    BE -->|"HTTPS — verify nutrients"| USDA
+    BE -->|"HTTPS — fallback lookup"| OFF
 ```
 
 ---
